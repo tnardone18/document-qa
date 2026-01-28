@@ -47,11 +47,11 @@ else:
     )
 
     if uploaded_file:
+        # Read the file BEFORE the button check
+        document = uploaded_file.read().decode()
+        
         # Add a button to generate summary
         if st.button("Generate Summary", type="primary"):
-            # Process the uploaded file
-            document = uploaded_file.read().decode()
-            
             # Get the appropriate instruction
             instruction = summary_instructions[summary_type]
             
