@@ -4,7 +4,8 @@ from openai import OpenAI
 # Show title and description.
 st.title("My Document Summarizer")
 st.write(
-    "Upload a document below and get a summary – GPT will generate it for you!")
+    "Upload a document below and get a summary – GPT will generate it for you!"
+    )
 
 # Sidebar options
 st.sidebar.header("Summary Options")
