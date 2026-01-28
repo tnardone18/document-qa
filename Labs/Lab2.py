@@ -20,8 +20,8 @@ summary_type = st.sidebar.radio(
 )
 
 # Model selection
-use_advanced = st.sidebar.checkbox("Use advanced model (GPT-5.2)")
-model = "gpt-5.2" if use_advanced else "gpt-4o-mini"
+use_advanced = st.sidebar.checkbox("Use advanced model (GPT-4o)")
+model = "gpt-4o" if use_advanced else "gpt-4o-mini"
 st.sidebar.caption(f"Current model: {model}")
 
 # Define summary instructions based on selection
