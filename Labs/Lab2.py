@@ -2,14 +2,12 @@ import streamlit as st
 from openai import OpenAI
 import PyPDF2
 
-def extract_text_from_pdf(pdf_path):
-    with open(pdf_path, 'rb') as file:
-        reader = PyPDF2.PdfFileReader(file)
-        text = ''
-        for page_num in range(reader.numPages):
-            page = reader.getPage(page_num)
-            text += page.extract_text()
-        return text
+def extract_text_from_pdf(uploaded_file):
+    reader = PyPDF2.PdfReader(uploaded_file)
+    text = ''
+    for page in reader.pages:
+        text += page.extract_text()
+    return text
 # Show title and description.
 st.title("Document Summarizer")
 st.write("Upload a document below and get a summary!")
