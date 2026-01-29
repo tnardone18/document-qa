@@ -2,52 +2,63 @@ import streamlit as st
 from openai import OpenAI
 
 # Show title and description.
-st.title("My app using secrets")
-st.write(
-    "Upload a document below and ask a question about it – GPT will answer! " 
+st.title("Document Summarizer")
+st.write("Upload a document below and get a summary!")
+
+# Sidebar options
+st.sidebar.header("Summary Options")
+
+# Summary type selection
+summary_type = st.sidebar.radio(
+    "Choose summary format:",
+    [
+        "100 words",
+        "2 connecting paragraphs",
+        "5 bullet points"
+    ]
 )
 
-# Ask user for their OpenAI API key via `st.text_input`.
-# Alternatively, you can store the API key in `./.streamlit/secrets.toml` and access it
-# via `st.secrets`, see https://docs.streamlit.io/develop/concepts/connections/secrets-management
+# Model selection
+use_advanced = st.sidebar.checkbox("Use advanced model")
+model = "gpt-4o" if use_advanced else "gpt-4o-mini"
+st.sidebar.caption(f"Current model: {model}")
+
+# Get API key from secrets
 openai_api_key = st.secrets.get("OPENAI_API_KEY")
 
 if openai_api_key:
-
-
-
-    # Create an OpenAI client.
     client = OpenAI(api_key=openai_api_key)
 
-    # Let the user upload a file via `st.file_uploader`.
+    # Let the user upload a file
     uploaded_file = st.file_uploader(
         "Upload a document (.txt or .md)", type=("txt", "md")
     )
 
-    # Ask the user for a question via `st.text_area`.
-    question = st.text_area(
-        "Now ask a question about the document!",
-        placeholder="Can you give me a short summary?",
-        disabled=not uploaded_file,
-    )
+    # Generate summary button
+    if uploaded_file:
+        if st.button("Generate Summary"):
+            document = uploaded_file.read().decode()
+            
+            # Build the prompt based on summary type
+            if summary_type == "100 words":
+                instruction = "Summarize the following document in exactly 100 words."
+            elif summary_type == "2 connecting paragraphs":
+                instruction = "Summarize the following document in 2 connecting paragraphs."
+            else:
+                instruction = "Summarize the following document in 5 bullet points."
+            
+            messages = [
+                {
+                    "role": "user",
+                    "content": f"{instruction}\n\nDocument: {document}",
+                }
+            ]
 
-    if uploaded_file and question:
+            # Generate summary using OpenAI API
+            stream = client.chat.completions.create(
+                model=model,
+                messages=messages,
+                stream=True,
+            )
 
-        # Process the uploaded file and question.
-        document = uploaded_file.read().decode()
-        messages = [
-            {
-                "role": "user",
-                "content": f"Here's a document: {document} \n\n---\n\n {question}",
-            }
-        ]
-
-        # Generate an answer using the OpenAI API.
-        stream = client.chat.completions.create(
-            model="gpt-4.1",
-            messages=messages,
-            stream=True,
-        )
-
-        # Stream the response to the app using `st.write_stream`.
-        st.write_stream(stream)
+            st.write_stream(stream)
