@@ -1,86 +1,53 @@
 import streamlit as st
 from openai import OpenAI
-import PyPDF2
-import io
 
 # Show title and description.
-st.title("My Document Summarizer")
+st.title("My app using secrets")
 st.write(
-    "Upload a document below and get a summary – GPT will generate it for you!")
-
-# Sidebar options
-st.sidebar.header("Summary Options")
-
-# Summary type selection
-summary_type = st.sidebar.radio(
-    "Choose summary format:",
-    options=[
-        "100 words",
-        "2 connecting paragraphs",
-        "5 bullet points"
-    ]
+    "Upload a document below and ask a question about it – GPT will answer! " 
 )
 
-# Model selection
-use_advanced = st.sidebar.checkbox("Use advanced model (GPT-4o)")
-model = "gpt-4o" if use_advanced else "gpt-4o-mini"
-st.sidebar.caption(f"Current model: {model}")
-
-# Define summary instructions based on selection
-summary_instructions = {
-    "100 words": "Summarize the following document in exactly 100 words. Be concise and capture the main points.",
-    "2 connecting paragraphs": "Summarize the following document in exactly 2 connecting paragraphs. The paragraphs should flow naturally from one to the other.",
-    "5 bullet points": "Summarize the following document in exactly 5 bullet points. Each bullet point should capture a key idea from the document."
-}
-
-def extract_text_from_pdf(pdf_file):
-    """Extract text from a PDF file."""
-    pdf_reader = PyPDF2.PdfReader(io.BytesIO(pdf_file.read()))
-    text = ""
-    for page in pdf_reader.pages:
-        text += page.extract_text() + "\n"
-    return text
-
-# Get API key from secrets
+# Ask user for their OpenAI API key via `st.text_input`.
+# Alternatively, you can store the API key in `./.streamlit/secrets.toml` and access it
+# via `st.secrets`, see https://docs.streamlit.io/develop/concepts/connections/secrets-management
 openai_api_key = st.secrets.get("OPENAI_API_KEY")
 
-if not openai_api_key:
-    st.error("OpenAI API key not found in secrets.", icon="❌")
-else:
+if openai_api_key:
+
+
+
     # Create an OpenAI client.
     client = OpenAI(api_key=openai_api_key)
 
     # Let the user upload a file via `st.file_uploader`.
     uploaded_file = st.file_uploader(
-        "Upload a document (.txt or .pdf or .md)", type=("txt", "pdf", "md")
+        "Upload a document (.txt or .md)", type=("txt", "md")
     )
 
-    if uploaded_file:
-        # Add a button to generate summary
-        if st.button("Generate Summary", type="primary"):
-            # Process the uploaded file based on type
-            if uploaded_file.type == "application/pdf":
-                document = extract_text_from_pdf(uploaded_file)
-            else:
-                document = uploaded_file.read().decode()
-            
-            # Get the appropriate instruction
-            instruction = summary_instructions[summary_type]
-            
-            messages = [
-                {
-                    "role": "user",
-                    "content": f"{instruction}\n\n---\n\nDocument:\n{document}",
-                }
-            ]
+    # Ask the user for a question via `st.text_area`.
+    question = st.text_area(
+        "Now ask a question about the document!",
+        placeholder="Can you give me a short summary?",
+        disabled=not uploaded_file,
+    )
 
-            # Generate summary using the OpenAI API.
-            with st.spinner("Generating summary..."):
-                stream = client.chat.completions.create(
-                    model=model,
-                    messages=messages,
-                    stream=True,
-                )
+    if uploaded_file and question:
 
-                # Stream the response to the app using `st.write_stream`.
-                st.write_stream(stream)
+        # Process the uploaded file and question.
+        document = uploaded_file.read().decode()
+        messages = [
+            {
+                "role": "user",
+                "content": f"Here's a document: {document} \n\n---\n\n {question}",
+            }
+        ]
+
+        # Generate an answer using the OpenAI API.
+        stream = client.chat.completions.create(
+            model="gpt-4.1",
+            messages=messages,
+            stream=True,
+        )
+
+        # Stream the response to the app using `st.write_stream`.
+        st.write_stream(stream)
