@@ -1,6 +1,15 @@
 import streamlit as st
 from openai import OpenAI
+import PyPDF2
 
+def extract_text_from_pdf(pdf_path):
+    with open(pdf_path, 'rb') as file:
+        reader = PyPDF2.PdfFileReader(file)
+        text = ''
+        for page_num in range(reader.numPages):
+            page = reader.getPage(page_num)
+            text += page.extract_text()
+        return text
 # Show title and description.
 st.title("Document Summarizer")
 st.write("Upload a document below and get a summary!")
@@ -31,9 +40,17 @@ if openai_api_key:
 
     # Let the user upload a file
     uploaded_file = st.file_uploader(
-        "Upload a document (.txt or .md)", type=("txt", "md")
+        "Upload a document (.txt or .pdf)", type=("txt", "pdf")
     )
-
+    if uploaded_file:
+        file_extension = uploaded_file.name.split('.')[-1]
+        if file_extension == 'txt':
+            document = uploaded_file.read().decode()
+        elif file_extension == 'pdf':
+            document = extract_text_from_pdf(uploaded_file)
+        else:
+            st.error("Unsupported file type.")
+            st.stop()
     # Generate summary button
     if uploaded_file:
         if st.button("Generate Summary"):
