@@ -52,7 +52,6 @@ if openai_api_key:
     # Generate summary button
     if uploaded_file:
         if st.button("Generate Summary"):
-            document = uploaded_file.read().decode()
             
             # Build the prompt based on summary type
             if summary_type == "100 words":
