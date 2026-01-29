@@ -1,11 +1,12 @@
 import streamlit as st
 from openai import OpenAI
+import PyPDF2
+import io
 
 # Show title and description.
 st.title("My Document Summarizer")
 st.write(
-    "Upload a document below and get a summary – GPT will generate it for you!"
-    )
+    "Upload a document below and get a summary – GPT will generate it for you!")
 
 # Sidebar options
 st.sidebar.header("Summary Options")
@@ -32,6 +33,14 @@ summary_instructions = {
     "5 bullet points": "Summarize the following document in exactly 5 bullet points. Each bullet point should capture a key idea from the document."
 }
 
+def extract_text_from_pdf(pdf_file):
+    """Extract text from a PDF file."""
+    pdf_reader = PyPDF2.PdfReader(io.BytesIO(pdf_file.read()))
+    text = ""
+    for page in pdf_reader.pages:
+        text += page.extract_text() + "\n"
+    return text
+
 # Get API key from secrets
 openai_api_key = st.secrets.get("OPENAI_API_KEY")
 
@@ -43,15 +52,18 @@ else:
 
     # Let the user upload a file via `st.file_uploader`.
     uploaded_file = st.file_uploader(
-        "Upload a document (.txt or .md)", type=("txt", "md")
+        "Upload a document (.txt or .pdf or .md)", type=("txt", "pdf", "md")
     )
 
     if uploaded_file:
-        # Read the file BEFORE the button check
-        document = uploaded_file.read().decode()
-        
         # Add a button to generate summary
         if st.button("Generate Summary", type="primary"):
+            # Process the uploaded file based on type
+            if uploaded_file.type == "application/pdf":
+                document = extract_text_from_pdf(uploaded_file)
+            else:
+                document = uploaded_file.read().decode()
+            
             # Get the appropriate instruction
             instruction = summary_instructions[summary_type]
             
