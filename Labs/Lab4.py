@@ -3,6 +3,16 @@ from openai import OpenAI
 import requests
 from bs4 import BeautifulSoup
 import tiktoken
+import sys
+import chromadb
+from pathlib import Path
+from PyPDF2 import PdfReader
+
+__import__('pysqlite3')
+sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
+
+chroma_client = chromadb.PersistentClient(path='./ChromaDB_for_lab')
+collection = chroma_client.get_or_create_collection('Lab4Collection')                                        
 
 def read_url_content(url):
     try:
@@ -23,11 +33,10 @@ def count_tokens(messages, model="gpt-4o-mini"):
     
     total_tokens = 0
     for message in messages:
-        # every message has overhead tokens for role, content, etc.
-        total_tokens += 4  # message overhead
+        total_tokens += 4
         for key, value in message.items():
             total_tokens += len(encoding.encode(value))
-    total_tokens += 2  # reply priming
+    total_tokens += 2
     return total_tokens
 
 # show title and description
@@ -59,7 +68,6 @@ for i, url in enumerate([url1, url2], 1):
     if url.strip():
         content = read_url_content(url.strip())
         if content:
-            # Truncate to avoid token limits
             truncated = content[:5000]
             url_context += f"\n\n--- Content from URL {i} ({url}) ---\n{truncated}"
             st.sidebar.success(f"URL {i} loaded successfully!")
@@ -67,7 +75,6 @@ for i, url in enumerate([url1, url2], 1):
             st.sidebar.error(f"URL {i} could not be loaded.")
 
 # define the system prompt with URL context baked in
-# this system prompt is NEVER discarded from the buffer
 base_system_content = """You are a helpful question answering assistant. Your job is to get the user's question and answer it clearly and accurately.
 
 IMPORTANT: Explain everything in simple terms that a 10 year old child can understand. Use easy words, short sentences, and fun examples when possible. Avoid jargon or complicated language.
@@ -99,6 +106,38 @@ if 'client' not in st.session_state:
     api_key = st.secrets["OPENAI_API_KEY"]
     st.session_state.client = OpenAI(api_key=api_key)
 
+def add_to_collection(collection, text, file_name):
+    client = st.session_state.client
+    response = client.embeddings.create(
+        input=text,
+        model="text-embedding-3-small"
+    )
+    embedding = response.data[0].embedding
+    collection.add(
+        documents=[text],
+        ids=[file_name],
+        embeddings=[embedding]
+    )
+
+def extract_text_from_pdf(pdf_path):
+    reader = PdfReader(pdf_path)
+    text = ""
+    for page in reader.pages:
+        text += page.extract_text() or ""
+    return text
+
+def load_pdfs_to_collection(folder_path, collection):
+    folder = Path(folder_path)
+    pdf_files = list(folder.glob("*.pdf"))
+    for pdf_file in pdf_files:
+        text = extract_text_from_pdf(pdf_file)
+        if text.strip():
+            add_to_collection(collection, text, pdf_file.name)
+
+if collection.count() == 0:
+    loaded = load_pdfs_to_collection('./Lab-04-Data/', collection)
+  
+
 if "messages" not in st.session_state:
     st.session_state["messages"] = [
         {"role": "assistant", "content": "How can I help you?"}
@@ -114,28 +153,43 @@ if prompt := st.chat_input("What is your question?"):
     with st.chat_message("user"):
         st.markdown(prompt)
     
-    # ---- TOKEN BUFFER STRATEGY (2,000 token limit) ----
-    # The system prompt is NEVER discarded.
-    # We start with the system prompt + the initial greeting,
-    # then add recent messages from newest to oldest until
-    # we hit the 2,000 token budget for conversation history.
+    # --- RAG Retrieval: query ChromaDB for relevant context ---
+    query_response = st.session_state.client.embeddings.create(
+        input=prompt,
+        model="text-embedding-3-small"
+    )
+    query_embedding = query_response.data[0].embedding
+
+    results = collection.query(
+        query_embeddings=[query_embedding],
+        n_results=3
+    )
+
+    rag_context = ""
+    if results and results['documents']:
+        for i, doc in enumerate(results['documents'][0]):
+            source = results['ids'][0][i]
+            rag_context += f"\n\n--- Retrieved from {source} ---\n{doc[:3000]}"
+
+    # Inject RAG context into system prompt
+    rag_system_prompt = dict(SYSTEM_PROMPT)
+    if rag_context:
+        rag_system_prompt["content"] += f"""
+
+The following content was retrieved from course documents and may be relevant to the user's question. Use this information to answer accurately. If you use this information, let the user know it came from course materials.
+{rag_context}"""
 
     TOKEN_BUDGET = 2000
 
-    # Always include the system prompt (never counted against the budget)
-    buffered_messages = [SYSTEM_PROMPT]
+    buffered_messages = [rag_system_prompt]
 
-    # Always include the initial assistant greeting
     initial_greeting = st.session_state.messages[0]
     buffered_messages.append(initial_greeting)
 
-    # Calculate remaining token budget after system prompt and greeting
     base_tokens = count_tokens(buffered_messages, model_to_use)
 
-    # Gather conversation messages (everything after the initial greeting)
     conversation_messages = st.session_state.messages[1:]
 
-    # Add messages from most recent to oldest, staying within budget
     selected_messages = []
     running_tokens = base_tokens
 
@@ -145,7 +199,7 @@ if prompt := st.chat_input("What is your question?"):
             selected_messages.insert(0, msg)
             running_tokens += msg_tokens
         else:
-            break  # stop adding older messages once budget is exceeded
+            break
 
     buffered_messages.extend(selected_messages)
 

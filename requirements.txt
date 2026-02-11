@@ -3,3 +3,6 @@ streamlit
 openai
 beautifulsoup4
 tiktoken
+chromadb
+pysqlite3-binary
+protobuf==3.20
