@@ -101,11 +101,6 @@ SYSTEM_PROMPT = {
     "content": base_system_content
 }
 
-# create an OpenAI client
-if 'client' not in st.session_state:
-    api_key = st.secrets["OPENAI_API_KEY"]
-    st.session_state.client = OpenAI(api_key=api_key)
-
 def add_to_collection(collection, text, file_name):
     client = st.session_state.client
     response = client.embeddings.create(
@@ -133,6 +128,11 @@ def load_pdfs_to_collection(folder_path, collection):
         text = extract_text_from_pdf(pdf_file)
         if text.strip():
             add_to_collection(collection, text, pdf_file.name)
+
+# create an OpenAI client
+if 'client' not in st.session_state:
+    api_key = st.secrets["OPENAI_API_KEY"]
+    st.session_state.client = OpenAI(api_key=api_key)
 
 if collection.count() == 0:
     loaded = load_pdfs_to_collection('./Lab-04-Data/', collection)
