@@ -135,7 +135,9 @@ if 'client' not in st.session_state:
     st.session_state.client = OpenAI(api_key=api_key)
 
 if collection.count() == 0:
-    loaded = load_pdfs_to_collection('./Lab-04-Data/', collection)
+    load_pdfs_to_collection('./Lab-04-Data/', collection)
+
+st.sidebar.write(f"Documents in ChromaDB: {collection.count()}")
   
 
 if "messages" not in st.session_state:
