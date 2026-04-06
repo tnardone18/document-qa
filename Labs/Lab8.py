@@ -14,10 +14,16 @@ CAPTION_PROMPT = (
     "Captions should vary in tone, such as, but not limited to funny, intellectual, and aesthetic."
 )
 
-MODEL = "gpt-4.1-mini"
-
 st.title("📸 Image Captioning Bot")
 st.write("Upload an image or paste a URL to get a description and creative captions.")
+
+# --- Model Selector (sidebar) ---
+MODEL = st.sidebar.selectbox(
+    "Choose a model",
+    ["gpt-4o-mini", "gpt-4o", "gpt-4.1-mini", "gpt-4.1"],
+    index=0
+)
+st.sidebar.caption(f"Currently using: **{MODEL}**")
 
 # =====================
 # PART A: Image URL
@@ -67,7 +73,7 @@ uploaded = st.file_uploader(
 if st.button("Generate Captions from Upload") and uploaded:
     with st.spinner("Analyzing uploaded image..."):
         b64 = base64.b64encode(uploaded.read()).decode("utf-8")
-        mime = uploaded.type  # e.g. "image/png"
+        mime = uploaded.type
         data_uri = f"data:{mime};base64,{b64}"
 
         response = client.chat.completions.create(
